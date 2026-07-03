@@ -4,6 +4,7 @@ from app.config import settings
 from app.api.v1 import ping
 from app.api.v1 import auth
 from app.api.v1 import quizzes
+from app.api.v1 import rooms
 
 app = FastAPI(
     title=settings.app_name,
@@ -24,6 +25,7 @@ app.add_middleware(
 app.include_router(ping.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(quizzes.router, prefix="/api/v1")
+app.include_router(rooms.router, prefix="/api/v1")
 
 @app.get("/")
 async def root():
