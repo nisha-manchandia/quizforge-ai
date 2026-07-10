@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>QuizForge WebSocket Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
+        #messages { border: 1px solid #ccc; height: 400px; overflow-y: auto; padding: 10px; margin: 10px 0; background: #f9f9f9; }
+        .message { margin: 5px 0; padding: 5px; border-radius: 4px; }
+        .sent { background: #d4edda; }
+        .received { background: #d1ecf1; }
+        .error { background: #f8d7da; }
+        input, button, select { margin: 5px; padding: 8px; }
+        button { background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h2>QuizForge WebSocket Test</h2>
+
+    <div>
+        <input id="roomCode" placeholder="Room code e.g. ABC123" value="NZ79JM" />
+        <input id="nickname" placeholder="Nickname" value="TestPlayer" />
+        <button onclick="connect()">Connect</button>
+        <button onclick="disconnect()">Disconnect</button>
+    </div>
+
+    <div>
+        <select id="answerSelect">
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+        </select>
+        <button onclick="submitAnswer()">Submit Answer</button>
+        <button onclick="getLeaderboard()">Get Leaderboard</button>
+        <button onclick="sendPing()">Ping</button>
+    </div>
+
+    <div id="messages"></div>
+
+    <script>
+        let ws = null;
+        let questionStartTime = null;
+
+        function log(message, type = 'received') {
+            const div = document.createElement('div');
+            div.className = `message ${type}`;
+            div.textContent = `${new Date().toLocaleTimeString()} → ${message}`;
+            document.getElementById('messages').appendChild(div);
+            document.getElementById('messages').scrollTop = 9999;
+        }
+
+        function connect() {
+            const roomCode = document.getElementById('roomCode').value;
+            const nickname = document.getElementById('nickname').value;
+
+            const url = `ws://localhost:8000/ws/room/${roomCode}?nickname=${nickname}`;
+            log(`Connecting to ${url}...`, 'sent');
+
+            ws = new WebSocket(url);
+
+            ws.onopen = () => {
+                log('WebSocket connected!', 'sent');
+                questionStartTime = Date.now();
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                log(JSON.stringify(data, null, 2));
+
+                if (data.type === 'question_started') {
+                    questionStartTime = Date.now();
+                }
+            };
+
+            ws.onerror = (error) => {
+                log(`Error: ${error}`, 'error');
+            };
+
+            ws.onclose = () => {
+                log('WebSocket disconnected', 'error');
+            };
+        }
+
+        function disconnect() {
+            if (ws) ws.close();
+        }
+
+        function submitAnswer() {
+            if (!ws) { log('Not connected!', 'error'); return; }
+            const timeTaken = questionStartTime
+                ? (Date.now() - questionStartTime) / 1000
+                : 5;
+            const message = {
+                type: 'submit_answer',
+                question_index: 0,
+                answer: document.getElementById('answerSelect').value,
+                time_taken: timeTaken
+            };
+            ws.send(JSON.stringify(message));
+            log(`Sent: ${JSON.stringify(message)}`, 'sent');
+        }
+
+        function getLeaderboard() {
+            if (!ws) { log('Not connected!', 'error'); return; }
+            ws.send(JSON.stringify({ type: 'get_leaderboard' }));
+            log('Sent: get_leaderboard request', 'sent');
+        }
+
+        function sendPing() {
+            if (!ws) { log('Not connected!', 'error'); return; }
+            ws.send(JSON.stringify({ type: 'ping' }));
+            log('Sent: ping', 'sent');
+        }
+    </script>
+</body>
+</html>

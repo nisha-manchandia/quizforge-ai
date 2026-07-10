@@ -5,6 +5,7 @@ from app.api.v1 import ping
 from app.api.v1 import auth
 from app.api.v1 import quizzes
 from app.api.v1 import rooms
+from app.api.v1 import websocket_routes
 
 app = FastAPI(
     title=settings.app_name,
@@ -26,6 +27,7 @@ app.include_router(ping.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(quizzes.router, prefix="/api/v1")
 app.include_router(rooms.router, prefix="/api/v1")
+app.include_router(websocket_routes.router)
 
 @app.get("/")
 async def root():
