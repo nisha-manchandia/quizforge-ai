@@ -1,4 +1,7 @@
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import StreamingResponse
+import qrcode
+import io
 from sqlalchemy.orm import Session
 from app.core.dependencies import get_db
 from app.api.v1.auth import get_current_user
@@ -127,3 +130,48 @@ async def get_room_leaderboard(
 ):
     """Get current leaderboard for a room."""
     return get_leaderboard(db, room_code)
+
+@router.get(
+    "/{room_code}/qr",
+    response_class=StreamingResponse
+)
+async def get_room_qr_code(
+    room_code: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """
+    Generate a QR code for joining a quiz room.
+    Students scan this to join instantly.
+    """
+    # Verify room exists
+    room = get_room_by_code(db, room_code)
+
+    # The URL students will land on when they scan
+    join_url = f"http://localhost:5173/join/{room_code}"
+
+    # Generate QR code
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4
+    )
+    qr.add_data(join_url)
+    qr.make(fit=True)
+
+    # Create image
+    img = qr.make_image(fill_color="black", back_color="white")
+
+    # Convert to bytes for streaming
+    img_bytes = io.BytesIO()
+    img.save(img_bytes, format="PNG")
+    img_bytes.seek(0)
+
+    return StreamingResponse(
+        img_bytes,
+        media_type="image/png",
+        headers={
+            "Content-Disposition": f"inline; filename=room_{room_code}_qr.png"
+        }
+    )
