@@ -3,81 +3,125 @@
 <head>
     <title>QuizForge WebSocket Test</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
-        #messages { border: 1px solid #ccc; height: 400px; overflow-y: auto; padding: 10px; margin: 10px 0; background: #f9f9f9; }
-        .message { margin: 5px 0; padding: 5px; border-radius: 4px; }
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 20px auto; padding: 20px; }
+        .container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        #messages { border: 1px solid #ccc; height: 350px; overflow-y: auto; padding: 10px; background: #f9f9f9; border-radius: 6px; }
+        #leaderboard { border: 1px solid #ccc; height: 350px; overflow-y: auto; padding: 10px; background: #f0f8ff; border-radius: 6px; }
+        .message { margin: 4px 0; padding: 6px; border-radius: 4px; font-size: 13px; }
         .sent { background: #d4edda; }
         .received { background: #d1ecf1; }
         .error { background: #f8d7da; }
-        input, button, select { margin: 5px; padding: 8px; }
-        button { background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .rank-1 { background: #ffd700; padding: 6px; border-radius: 4px; margin: 3px 0; font-weight: bold; }
+        .rank-other { background: #e8e8e8; padding: 6px; border-radius: 4px; margin: 3px 0; }
+        input, button, select { margin: 4px; padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .controls { margin: 15px 0; }
+        h3 { margin: 5px 0; color: #333; }
     </style>
 </head>
 <body>
-    <h2>QuizForge WebSocket Test</h2>
+    <h2>QuizForge — Live Quiz Test</h2>
 
-    <div>
-        <input id="roomCode" placeholder="Room code e.g. ABC123" value="NZ79JM" />
-        <input id="nickname" placeholder="Nickname" value="TestPlayer" />
+    <div class="controls">
+        <input id="roomCode" placeholder="Room code" style="width: 120px;" />
+        <input id="nickname" placeholder="Your nickname" style="width: 120px;" />
         <button onclick="connect()">Connect</button>
-        <button onclick="disconnect()">Disconnect</button>
+        <button onclick="disconnect()" style="background:#dc3545;">Disconnect</button>
+        <span id="status" style="margin-left:10px; font-weight:bold; color:gray;">Disconnected</span>
     </div>
 
-    <div>
+    <div class="controls">
+        <strong>Submit answer:</strong>
         <select id="answerSelect">
-            <option value="A">A</option>
-            <option value="B">B</option>
-            <option value="C">C</option>
-            <option value="D">D</option>
+            <option value="A">A — Ordered mutable collection</option>
+            <option value="B">B — Ordered immutable collection</option>
+            <option value="C">C — Unordered collection</option>
+            <option value="D">D — Key-value store</option>
         </select>
         <button onclick="submitAnswer()">Submit Answer</button>
-        <button onclick="getLeaderboard()">Get Leaderboard</button>
-        <button onclick="sendPing()">Ping</button>
+        <button onclick="getLeaderboard()" style="background:#28a745;">Get Leaderboard</button>
+        <button onclick="sendPing()" style="background:#6c757d;">Ping</button>
     </div>
 
-    <div id="messages"></div>
+    <div class="container">
+        <div>
+            <h3>Messages</h3>
+            <div id="messages"></div>
+        </div>
+        <div>
+            <h3>Live Leaderboard</h3>
+            <div id="leaderboard"><p style="color:gray;">Waiting for scores...</p></div>
+        </div>
+    </div>
 
     <script>
         let ws = null;
-        let questionStartTime = null;
+        let questionStartTime = Date.now();
 
         function log(message, type = 'received') {
             const div = document.createElement('div');
             div.className = `message ${type}`;
-            div.textContent = `${new Date().toLocaleTimeString()} → ${message}`;
-            document.getElementById('messages').appendChild(div);
-            document.getElementById('messages').scrollTop = 9999;
+            div.textContent = `${new Date().toLocaleTimeString()} → ${
+                typeof message === 'object' ? JSON.stringify(message) : message
+            }`;
+            const box = document.getElementById('messages');
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function updateLeaderboard(entries) {
+            const box = document.getElementById('leaderboard');
+            if (!entries || entries.length === 0) {
+                box.innerHTML = '<p style="color:gray;">No scores yet</p>';
+                return;
+            }
+            box.innerHTML = entries.map(e => `
+                <div class="${e.rank === 1 ? 'rank-1' : 'rank-other'}">
+                    ${e.rank}. ${e.nickname} — ${e.score} pts
+                </div>
+            `).join('');
         }
 
         function connect() {
-            const roomCode = document.getElementById('roomCode').value;
-            const nickname = document.getElementById('nickname').value;
+            const roomCode = document.getElementById('roomCode').value.trim();
+            const nickname = document.getElementById('nickname').value.trim();
+
+            if (!roomCode || !nickname) {
+                log('Please enter room code and nickname', 'error');
+                return;
+            }
 
             const url = `ws://localhost:8000/ws/room/${roomCode}?nickname=${nickname}`;
-            log(`Connecting to ${url}...`, 'sent');
+            log(`Connecting as ${nickname} to room ${roomCode}...`, 'sent');
 
             ws = new WebSocket(url);
 
             ws.onopen = () => {
-                log('WebSocket connected!', 'sent');
+                document.getElementById('status').textContent = 'Connected ✅';
+                document.getElementById('status').style.color = 'green';
                 questionStartTime = Date.now();
             };
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                log(JSON.stringify(data, null, 2));
+                log(data);
+
+                if (data.type === 'leaderboard_update') {
+                    updateLeaderboard(data.entries);
+                }
 
                 if (data.type === 'question_started') {
                     questionStartTime = Date.now();
                 }
             };
 
-            ws.onerror = (error) => {
-                log(`Error: ${error}`, 'error');
-            };
+            ws.onerror = () => log('Connection error', 'error');
 
             ws.onclose = () => {
-                log('WebSocket disconnected', 'error');
+                document.getElementById('status').textContent = 'Disconnected ❌';
+                document.getElementById('status').style.color = 'red';
+                log('Disconnected from room');
             };
         }
 
@@ -86,30 +130,36 @@
         }
 
         function submitAnswer() {
-            if (!ws) { log('Not connected!', 'error'); return; }
-            const timeTaken = questionStartTime
-                ? (Date.now() - questionStartTime) / 1000
-                : 5;
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('Not connected!', 'error');
+                return;
+            }
+            const timeTaken = (Date.now() - questionStartTime) / 1000;
             const message = {
                 type: 'submit_answer',
                 question_index: 0,
                 answer: document.getElementById('answerSelect').value,
-                time_taken: timeTaken
+                time_taken: parseFloat(timeTaken.toFixed(2))
             };
             ws.send(JSON.stringify(message));
-            log(`Sent: ${JSON.stringify(message)}`, 'sent');
+            log(`Sent answer: ${message.answer} in ${message.time_taken}s`, 'sent');
         }
 
         function getLeaderboard() {
-            if (!ws) { log('Not connected!', 'error'); return; }
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('Not connected!', 'error');
+                return;
+            }
             ws.send(JSON.stringify({ type: 'get_leaderboard' }));
-            log('Sent: get_leaderboard request', 'sent');
         }
 
         function sendPing() {
-            if (!ws) { log('Not connected!', 'error'); return; }
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('Not connected!', 'error');
+                return;
+            }
             ws.send(JSON.stringify({ type: 'ping' }));
-            log('Sent: ping', 'sent');
+            log('Sent ping', 'sent');
         }
     </script>
 </body>
