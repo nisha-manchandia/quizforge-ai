@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, status
+from app.config import settings
 from fastapi.responses import StreamingResponse
-import qrcode
-import io
 from sqlalchemy.orm import Session
 from app.core.dependencies import get_db
 from app.api.v1.auth import get_current_user
@@ -22,6 +21,8 @@ from app.services.room_service import (
     get_leaderboard
 )
 from uuid import UUID
+import qrcode
+import io
 
 router = APIRouter(prefix="/rooms", tags=["Rooms"])
 
@@ -46,8 +47,7 @@ async def create_quiz_room(
 )
 async def get_room(
     room_code: str,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
     """Get room details by room code."""
     return get_room_by_code(db, room_code)
@@ -60,15 +60,14 @@ async def get_room(
 async def join_quiz_room(
     room_code: str,
     join_data: JoinRoom,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
-    """Join a quiz room as a registered user."""
+    """Join a quiz room — works for both registered users and guests."""
     participant = join_room(
         db,
         room_code,
         join_data,
-        user_id=current_user.id
+        user_id=None
     )
     room = get_room_by_code(db, room_code)
     return {
@@ -125,11 +124,11 @@ async def end_quiz_room(
 )
 async def get_room_leaderboard(
     room_code: str,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
     """Get current leaderboard for a room."""
     return get_leaderboard(db, room_code)
+
 
 @router.get(
     "/{room_code}/qr",
@@ -140,17 +139,10 @@ async def get_room_qr_code(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    """
-    Generate a QR code for joining a quiz room.
-    Students scan this to join instantly.
-    """
-    # Verify room exists
+    """Generate a QR code for joining a quiz room."""
     room = get_room_by_code(db, room_code)
+    join_url = f"{settings.frontend_url}/join/{room_code}"
 
-    # The URL students will land on when they scan
-    join_url = f"http://localhost:5173/join/{room_code}"
-
-    # Generate QR code
     qr = qrcode.QRCode(
         version=1,
         error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -160,10 +152,7 @@ async def get_room_qr_code(
     qr.add_data(join_url)
     qr.make(fit=True)
 
-    # Create image
     img = qr.make_image(fill_color="black", back_color="white")
-
-    # Convert to bytes for streaming
     img_bytes = io.BytesIO()
     img.save(img_bytes, format="PNG")
     img_bytes.seek(0)

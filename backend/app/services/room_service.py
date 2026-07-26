@@ -103,11 +103,6 @@ def join_room(
             detail="This quiz has already ended"
         )
 
-    if room.status == "active":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Quiz is already in progress"
-        )
 
     # Check participant limit
     current_count = db.query(SessionParticipant).filter(

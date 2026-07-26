@@ -169,9 +169,21 @@ function Dashboard({ user, onLogout }: { user: User, onLogout: () => void }) {
   }
 
   const startRoom = async (roomCode: string) => {
-    await apiFetch(`/rooms/${roomCode}/start`, { method: 'POST' })
-    setMessage(`✅ Room ${roomCode} started!`)
+  try {
+    const data = await apiFetch(`/rooms/${roomCode}/start`, { method: 'POST' })
+    if (data.status === 'active') {
+      setMessage(`✅ Room ${roomCode} is now ACTIVE! Share code with students.`)
+      setActiveRoom(data)
+    } else if (data.detail) {
+      setMessage(`❌ Error: ${data.detail}`)
+    } else {
+      setMessage(`✅ Room started! Status: ${data.status}`)
+    }
+  } catch (err) {
+    setMessage('❌ Failed to start room. Make sure backend is running.')
   }
+}
+
 
   const updateQuestion = (idx: number, field: string, value: string) => {
     const updated = [...questions]
@@ -385,6 +397,256 @@ function Dashboard({ user, onLogout }: { user: User, onLogout: () => void }) {
     </div>
   )
 }
+// ─── Join Page (Student) ──────────────────────────────────────
+function JoinPage({ onJoined }: { onJoined: (roomCode: string, nickname: string) => void }) {
+  const [roomCode, setRoomCode] = useState('')
+  const [nickname, setNickname] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleJoin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
+    try {
+      const res = await fetch(`${API}/rooms/${roomCode.toUpperCase()}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname })
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.detail || 'Failed to join room')
+        return
+      }
+
+      onJoined(roomCode.toUpperCase(), nickname)
+
+    } catch {
+      setError('Cannot connect to server')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      <div style={{ background: 'white', borderRadius: '16px', padding: '40px', width: '100%', maxWidth: '420px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#4F46E5', margin: 0 }}>🧠 QuizForge AI</h1>
+          <p style={{ color: '#6B7280', marginTop: '8px' }}>Join a Quiz Room</p>
+        </div>
+
+        {error && (
+          <div style={{ background: '#FEE2E2', color: '#DC2626', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '14px' }}>
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleJoin}>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Room Code</label>
+            <input
+              type="text"
+              value={roomCode}
+              onChange={e => setRoomCode(e.target.value.toUpperCase())}
+              required
+              maxLength={6}
+              style={{ width: '100%', padding: '12px 16px', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '24px', fontWeight: 'bold', letterSpacing: '6px', textAlign: 'center', outline: 'none', boxSizing: 'border-box' }}
+              placeholder="ABC123"
+            />
+          </div>
+
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Your Nickname</label>
+            <input
+              type="text"
+              value={nickname}
+              onChange={e => setNickname(e.target.value)}
+              required
+              style={{ width: '100%', padding: '12px 16px', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '16px', outline: 'none', boxSizing: 'border-box' }}
+              placeholder="Enter your name"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{ width: '100%', padding: '14px', background: loading ? '#9CA3AF' : '#4F46E5', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer' }}
+          >
+            {loading ? 'Joining...' : '🚀 Join Quiz'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─── Live Quiz Page ───────────────────────────────────────────
+function LiveQuizPage({ roomCode, nickname }: { roomCode: string, nickname: string }) {
+  const [messages, setMessages] = useState<string[]>([])
+  const [leaderboard, setLeaderboard] = useState<any[]>([])
+  const [connected, setConnected] = useState(false)
+  const [ws, setWs] = useState<WebSocket | null>(null)
+  const [answered, setAnswered] = useState(false)
+  const [lastResult, setLastResult] = useState<any>(null)
+
+  useEffect(() => {
+    const socket = new WebSocket(
+      `ws://localhost:8000/ws/room/${roomCode}?nickname=${nickname}`
+    )
+
+    socket.onopen = () => {
+      setConnected(true)
+      addMessage('✅ Connected to room!')
+    }
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data)
+
+      if (data.type === 'leaderboard_update') {
+        setLeaderboard(data.entries)
+      } else if (data.type === 'answer_result') {
+        setLastResult(data)
+        addMessage(`${data.correct ? '✅ Correct!' : '❌ Wrong!'} +${data.points_earned} points`)
+      } else if (data.type === 'player_joined') {
+        addMessage(`👤 ${data.nickname} joined! (${data.player_count} players)`)
+      } else if (data.type === 'player_left') {
+        addMessage(`👋 ${data.nickname} left`)
+      } else {
+        addMessage(`📨 ${data.type}: ${JSON.stringify(data).substring(0, 80)}`)
+      }
+    }
+
+    socket.onclose = () => {
+      setConnected(false)
+      addMessage('❌ Disconnected')
+    }
+
+    setWs(socket)
+    return () => socket.close()
+  }, [])
+
+  const addMessage = (msg: string) => {
+    setMessages(prev => [`${new Date().toLocaleTimeString()} — ${msg}`, ...prev].slice(0, 20))
+  }
+
+  const submitAnswer = (answer: string) => {
+    if (!ws || answered) return
+    ws.send(JSON.stringify({
+      type: 'submit_answer',
+      question_index: 0,
+      answer,
+      time_taken: 5
+    }))
+    setAnswered(true)
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#F8FAFC' }}>
+      <nav style={{ background: '#4F46E5', padding: '16px 32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h1 style={{ color: 'white', margin: 0, fontSize: '20px' }}>🧠 QuizForge AI</h1>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <span style={{ color: '#C7D2FE', fontSize: '14px' }}>Room: <strong style={{ color: 'white', letterSpacing: '2px' }}>{roomCode}</strong></span>
+          <span style={{ color: '#C7D2FE', fontSize: '14px' }}>👤 {nickname}</span>
+          <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', background: connected ? '#10B981' : '#EF4444', color: 'white' }}>
+            {connected ? '● Live' : '● Offline'}
+          </span>
+        </div>
+      </nav>
+
+      <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '24px 20px', display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
+
+        {/* Left — Quiz Area */}
+        <div>
+          {/* Answer Buttons */}
+          <div style={{ background: 'white', borderRadius: '12px', padding: '24px', border: '1px solid #E5E7EB', marginBottom: '20px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Submit Answer</h2>
+            <p style={{ color: '#6B7280', fontSize: '14px', marginBottom: '16px' }}>
+              {answered ? '✅ Answer submitted! Wait for next question.' : 'Click to submit your answer:'}
+            </p>
+
+            {lastResult && (
+              <div style={{ background: lastResult.correct ? '#D1FAE5' : '#FEE2E2', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '14px', color: lastResult.correct ? '#065F46' : '#DC2626' }}>
+                {lastResult.correct ? '✅ Correct!' : '❌ Wrong!'} Points earned: {lastResult.points_earned} | Total: {lastResult.total_score}
+                {lastResult.explanation && <p style={{ marginTop: '8px', color: '#374151' }}>💡 {lastResult.explanation}</p>}
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              {['A', 'B', 'C', 'D'].map(opt => (
+                <button
+                  key={opt}
+                  onClick={() => submitAnswer(opt)}
+                  disabled={answered}
+                  style={{
+                    padding: '16px',
+                    background: answered ? '#F3F4F6' : '#4F46E5',
+                    color: answered ? '#9CA3AF' : 'white',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    cursor: answered ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+
+            {answered && (
+              <button
+                onClick={() => { setAnswered(false); setLastResult(null) }}
+                style={{ marginTop: '12px', padding: '8px 16px', background: '#6366F1', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}
+              >
+                Next Question
+              </button>
+            )}
+          </div>
+
+          {/* Messages */}
+          <div style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid #E5E7EB' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1F2937', marginBottom: '12px' }}>Live Feed</h3>
+            <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+              {messages.map((msg, i) => (
+                <p key={i} style={{ margin: '4px 0', fontSize: '13px', color: '#6B7280', padding: '4px 8px', background: '#F9FAFB', borderRadius: '4px' }}>{msg}</p>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Right — Leaderboard */}
+        <div style={{ background: 'white', borderRadius: '12px', padding: '20px', border: '1px solid #E5E7EB', height: 'fit-content' }}>
+          <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1F2937', marginBottom: '16px' }}>🏆 Leaderboard</h3>
+          {leaderboard.length === 0 ? (
+            <p style={{ color: '#9CA3AF', fontSize: '14px', textAlign: 'center' }}>Waiting for scores...</p>
+          ) : (
+            leaderboard.map((entry, i) => (
+              <div key={i} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '10px 12px',
+                marginBottom: '8px',
+                borderRadius: '8px',
+                background: i === 0 ? '#FEF3C7' : '#F9FAFB',
+                border: i === 0 ? '1px solid #FCD34D' : '1px solid #F3F4F6'
+              }}>
+                <span style={{ fontSize: '14px', fontWeight: i === 0 ? 'bold' : 'normal' }}>
+                  {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`} {entry.nickname}
+                </span>
+                <span style={{ fontSize: '14px', fontWeight: '600', color: '#4F46E5' }}>{entry.score} pts</span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ─── Main App ─────────────────────────────────────────────────
 export default function App() {
@@ -392,8 +654,11 @@ export default function App() {
     const saved = localStorage.getItem('user')
     return saved ? JSON.parse(saved) : null
   })
+  const [page, setPage] = useState<'login' | 'join' | 'live'>('login')
+  const [roomCode, setRoomCode] = useState('')
+  const [nickname, setNickname] = useState('')
 
-  const handleLogin = (user: User, token: string) => {
+  const handleLogin = (user: User) => {
     localStorage.setItem('user', JSON.stringify(user))
     setUser(user)
   }
@@ -401,8 +666,39 @@ export default function App() {
   const handleLogout = () => {
     localStorage.clear()
     setUser(null)
+    setPage('login')
   }
 
-  if (!user) return <LoginPage onLogin={handleLogin} />
-  return <Dashboard user={user} onLogout={handleLogout} />
+  const handleJoined = (code: string, nick: string) => {
+    setRoomCode(code)
+    setNickname(nick)
+    setPage('live')
+  }
+
+  if (user) return <Dashboard user={user} onLogout={handleLogout} />
+  if (page === 'join') return <JoinPage onJoined={handleJoined} />
+  if (page === 'live') return <LiveQuizPage roomCode={roomCode} nickname={nickname} />
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      <div style={{ background: 'white', borderRadius: '16px', padding: '40px', width: '100%', maxWidth: '420px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)', textAlign: 'center' }}>
+        <h1 style={{ fontSize: '32px', fontWeight: 'bold', color: '#4F46E5', margin: '0 0 8px' }}>🧠 QuizForge AI</h1>
+        <p style={{ color: '#6B7280', marginBottom: '32px' }}>AI-powered real-time quiz platform</p>
+
+        <button
+          onClick={() => setPage('login')}
+          style={{ width: '100%', padding: '14px', background: '#4F46E5', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', marginBottom: '12px' }}
+        >
+          🎓 Login as Teacher
+        </button>
+
+        <button
+          onClick={() => setPage('join')}
+          style={{ width: '100%', padding: '14px', background: 'white', color: '#4F46E5', border: '2px solid #4F46E5', borderRadius: '8px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}
+        >
+          🎮 Join as Student
+        </button>
+      </div>
+    </div>
+  )
 }
