@@ -655,14 +655,15 @@ export default function App() {
     const saved = localStorage.getItem('user')
     return saved ? JSON.parse(saved) : null
   })
-  const [page, setPage] = useState<'login' | 'join' | 'live'>('login')
+  const [page, setPage] = useState<'home' | 'login' | 'join' | 'live'>('home')
   const [roomCode, setRoomCode] = useState('')
   const [nickname, setNickname] = useState('')
 
-  const handleLogin = (user: User) => {
-    localStorage.setItem('user', JSON.stringify(user))
-    setUser(user)
-  }
+  const handleLogin = (user: User, token: string) => {
+  localStorage.setItem('user', JSON.stringify(user))
+  localStorage.setItem('token', token)
+  setUser(user)
+}
 
   const handleLogout = () => {
     localStorage.clear()
@@ -677,8 +678,18 @@ export default function App() {
   }
 
   if (user) return <Dashboard user={user} onLogout={handleLogout} />
-  if (page === 'join') return <JoinPage onJoined={handleJoined} />
-  if (page === 'live') return <LiveQuizPage roomCode={roomCode} nickname={nickname} />
+
+  if (page === 'login') {
+    return <LoginPage onLogin={handleLogin} />
+  }
+
+  if (page === 'join') {
+    return <JoinPage onJoined={handleJoined} />
+  }
+
+  if (page === 'live') {
+    return <LiveQuizPage roomCode={roomCode} nickname={nickname} />
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
