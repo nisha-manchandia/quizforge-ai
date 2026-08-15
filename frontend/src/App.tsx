@@ -27,7 +27,7 @@ interface Room {
 }
 
 // ─── API Helper ───────────────────────────────────────────────
-const API = 'http://localhost:8000/api/v1'
+const API = 'https://quizforge-backend-as1x.onrender.com/api/v1'
 
 async function apiFetch(path: string, options: any = {}) {
   const token = localStorage.getItem('token')
@@ -495,8 +495,9 @@ function LiveQuizPage({ roomCode, nickname }: { roomCode: string, nickname: stri
 
   useEffect(() => {
     const socket = new WebSocket(
-      `ws://localhost:8000/ws/room/${roomCode}?nickname=${nickname}`
-    )
+      `wss://quizforge-backend-as1x.onrender.com/ws/room/${roomCode}?nickname=${nickname}`
+)
+    
 
     socket.onopen = () => {
       setConnected(true)
