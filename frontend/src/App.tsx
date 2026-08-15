@@ -43,7 +43,13 @@ async function apiFetch(path: string, options: any = {}) {
 }
 
 // ─── Login Page ───────────────────────────────────────────────
-function LoginPage({ onLogin }: { onLogin: (user: User, token: string) => void }) {
+function LoginPage({
+  onLogin,
+  onRegister
+}: {
+  onLogin: (user: User, token: string) => void
+  onRegister: () => void
+}) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -53,16 +59,30 @@ function LoginPage({ onLogin }: { onLogin: (user: User, token: string) => void }
     e.preventDefault()
     setLoading(true)
     setError('')
+
     try {
       const res = await fetch(`${API}/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email,
+          password
+        })
       })
+
       const data = await res.json()
-      if (!res.ok) { setError(data.detail || 'Login failed'); return }
+
+      if (!res.ok) {
+        setError(data.detail || 'Login failed')
+        return
+      }
+
       localStorage.setItem('token', data.access_token)
+
       onLogin(data.user, data.access_token)
+
     } catch {
       setError('Cannot connect to server')
     } finally {
@@ -71,26 +91,414 @@ function LoginPage({ onLogin }: { onLogin: (user: User, token: string) => void }
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-      <div style={{ background: 'white', borderRadius: '16px', padding: '40px', width: '100%', maxWidth: '420px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#4F46E5', margin: 0 }}>🧠 QuizForge AI</h1>
-          <p style={{ color: '#6B7280', marginTop: '8px' }}>Sign in to your account</p>
+    <div
+      style={{
+        minHeight: '100vh',
+        background:
+          'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px'
+      }}
+    >
+      <div
+        style={{
+          background: 'white',
+          borderRadius: '16px',
+          padding: '40px',
+          width: '100%',
+          maxWidth: '420px',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.2)'
+        }}
+      >
+        <div
+          style={{
+            textAlign: 'center',
+            marginBottom: '32px'
+          }}
+        >
+          <h1
+            style={{
+              fontSize: '28px',
+              fontWeight: 'bold',
+              color: '#4F46E5',
+              margin: 0
+            }}
+          >
+            🧠 QuizForge AI
+          </h1>
+
+          <p
+            style={{
+              color: '#6B7280',
+              marginTop: '8px'
+            }}
+          >
+            Sign in to your account
+          </p>
         </div>
-        {error && <div style={{ background: '#FEE2E2', color: '#DC2626', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontSize: '14px' }}>{error}</div>}
+
+        {error && (
+          <div
+            style={{
+              background: '#FEE2E2',
+              color: '#DC2626',
+              padding: '12px',
+              borderRadius: '8px',
+              marginBottom: '16px',
+              fontSize: '14px'
+            }}
+          >
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleLogin}>
           <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required style={{ width: '100%', padding: '12px 16px', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '16px', outline: 'none', boxSizing: 'border-box' }} placeholder="nisha@example.com" />
+            <label
+              style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: '#374151',
+                marginBottom: '6px'
+              }}
+            >
+              Email
+            </label>
+
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="teacher@example.com"
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                border: '1px solid #D1D5DB',
+                borderRadius: '8px',
+                fontSize: '16px',
+                boxSizing: 'border-box'
+              }}
+            />
           </div>
+
           <div style={{ marginBottom: '24px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px' }}>Password</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required style={{ width: '100%', padding: '12px 16px', border: '1px solid #D1D5DB', borderRadius: '8px', fontSize: '16px', outline: 'none', boxSizing: 'border-box' }} placeholder="••••••••" />
+            <label
+              style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: '#374151',
+                marginBottom: '6px'
+              }}
+            >
+              Password
+            </label>
+
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              placeholder="••••••••"
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                border: '1px solid #D1D5DB',
+                borderRadius: '8px',
+                fontSize: '16px',
+                boxSizing: 'border-box'
+              }}
+            />
           </div>
-          <button type="submit" disabled={loading} style={{ width: '100%', padding: '14px', background: loading ? '#9CA3AF' : '#4F46E5', color: 'white', border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer' }}>
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '14px',
+              background: loading ? '#9CA3AF' : '#4F46E5',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
+
+        <p
+          style={{
+            textAlign: 'center',
+            marginTop: '20px',
+            color: '#6B7280',
+            fontSize: '14px'
+          }}
+        >
+          New teacher?{' '}
+          <button
+            type="button"
+            onClick={onRegister}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#4F46E5',
+              cursor: 'pointer',
+              fontWeight: '600'
+            }}
+          >
+            Create an account
+          </button>
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ─── Register Page (Teacher) ───────────────────────────────────
+function RegisterPage({ onRegistered }: { onRegistered: (user: User, token: string) => void }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
+    try {
+      const res = await fetch(`${API}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          full_name: fullName,
+          role: 'teacher'
+        })
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.detail || 'Registration failed')
+        return
+      }
+
+      // Registration successful.
+      // Now login automatically using the same credentials.
+      const loginRes = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
+
+      const loginData = await loginRes.json()
+
+      if (!loginRes.ok) {
+        setError('Account created! Please login.')
+        return
+      }
+
+      localStorage.setItem('token', loginData.access_token)
+      onRegistered(loginData.user, loginData.access_token)
+
+    } catch {
+      setError('Cannot connect to server')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px'
+    }}>
+      <div style={{
+        background: 'white',
+        borderRadius: '16px',
+        padding: '40px',
+        width: '100%',
+        maxWidth: '420px',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.2)'
+      }}>
+
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <h1 style={{
+            fontSize: '28px',
+            fontWeight: 'bold',
+            color: '#4F46E5',
+            margin: 0
+          }}>
+            🧠 QuizForge AI
+          </h1>
+
+          <p style={{
+            color: '#6B7280',
+            marginTop: '8px'
+          }}>
+            Create your Teacher account
+          </p>
+        </div>
+
+        {error && (
+          <div style={{
+            background: '#FEE2E2',
+            color: '#DC2626',
+            padding: '12px',
+            borderRadius: '8px',
+            marginBottom: '16px',
+            fontSize: '14px'
+          }}>
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleRegister}>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: '#374151',
+              marginBottom: '6px'
+            }}>
+              Full Name
+            </label>
+
+            <input
+              type="text"
+              value={fullName}
+              onChange={e => setFullName(e.target.value)}
+              required
+              placeholder="Enter your full name"
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                border: '1px solid #D1D5DB',
+                borderRadius: '8px',
+                fontSize: '16px',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: '#374151',
+              marginBottom: '6px'
+            }}>
+              Email
+            </label>
+
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              required
+              placeholder="teacher@example.com"
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                border: '1px solid #D1D5DB',
+                borderRadius: '8px',
+                fontSize: '16px',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: '#374151',
+              marginBottom: '6px'
+            }}>
+              Password
+            </label>
+
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              required
+              placeholder="Create a password"
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                border: '1px solid #D1D5DB',
+                borderRadius: '8px',
+                fontSize: '16px',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '14px',
+              background: loading ? '#9CA3AF' : '#4F46E5',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: loading ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {loading ? 'Creating Account...' : 'Create Teacher Account'}
+          </button>
+
+        </form>
+
+        <p style={{
+          textAlign: 'center',
+          marginTop: '20px',
+          color: '#6B7280',
+          fontSize: '14px'
+        }}>
+          Already have an account?{' '}
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#4F46E5',
+              cursor: 'pointer',
+              fontWeight: '600'
+            }}
+          >
+            Login
+          </button>
+        </p>
+
       </div>
     </div>
   )
@@ -103,6 +511,7 @@ function Dashboard({ user, onLogout }: { user: User, onLogout: () => void }) {
   const [view, setView] = useState<'quizzes' | 'create' | 'room'>('quizzes')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+
 
   // Create Quiz Form
   const [quizTitle, setQuizTitle] = useState('')
@@ -655,7 +1064,7 @@ export default function App() {
     const saved = localStorage.getItem('user')
     return saved ? JSON.parse(saved) : null
   })
-  const [page, setPage] = useState<'home' | 'login' | 'join' | 'live'>('home')
+  const [page, setPage] = useState<'home' | 'login' | 'register' | 'join' | 'live'>('home')
   const [roomCode, setRoomCode] = useState('')
   const [nickname, setNickname] = useState('')
 
@@ -665,11 +1074,12 @@ export default function App() {
   setUser(user)
 }
 
-  const handleLogout = () => {
-    localStorage.clear()
-    setUser(null)
-    setPage('login')
-  }
+
+  const handleRegistered = (user: User, token: string) => {
+  localStorage.setItem('user', JSON.stringify(user))
+  localStorage.setItem('token', token)
+  setUser(user)
+}
 
   const handleJoined = (code: string, nick: string) => {
     setRoomCode(code)
@@ -677,15 +1087,35 @@ export default function App() {
     setPage('live')
   }
 
+  const handleLogout = () => {
+  localStorage.removeItem('token')
+  setUser(null)
+  setPage('login')
+}
+
   if (user) return <Dashboard user={user} onLogout={handleLogout} />
 
   if (page === 'login') {
-    return <LoginPage onLogin={handleLogin} />
-  }
+  return (
+    <LoginPage
+      onLogin={handleLogin}
+      onRegister={() => setPage('register')}
+    />
+  )
+}
 
-  if (page === 'join') {
-    return <JoinPage onJoined={handleJoined} />
-  }
+
+if (page === 'register') {
+  return (
+    <RegisterPage
+      onRegistered={handleRegistered}
+    />
+  )
+}
+
+if (page === 'join') {
+  return <JoinPage onJoined={handleJoined} />
+}
 
   if (page === 'live') {
     return <LiveQuizPage roomCode={roomCode} nickname={nickname} />
