@@ -108,7 +108,7 @@ def generate_quiz_with_gemini(
     import google.generativeai as genai
 
     genai.configure(api_key=settings.gemini_api_key)
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-3.6-flash")
 
     full_prompt = f"""Generate {num_questions} multiple choice questions about: {prompt}
 Difficulty level: {difficulty}
@@ -163,7 +163,7 @@ Explain in 2-3 sentences why this is correct and why others are wrong."""
     elif settings.gemini_api_key and len(settings.gemini_api_key) > 10:
         import google.generativeai as genai
         genai.configure(api_key=settings.gemini_api_key)
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        model = genai.GenerativeModel("gemini-3.6-flash")
         prompt = f"""Question: {question_text}
 Correct answer: {correct_answer} — {options.get(correct_answer, '')}
 Explain in 2-3 sentences why this is correct."""
